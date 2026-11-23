@@ -34,6 +34,12 @@
       "head_sampling_rate": 1,
       "invocation_logs": true
     }
+  },
+
+  // 预置采集源：/api/status 的 defaultSources 直接由它下发，前端首次打开即带出这 5 个源。
+  // 值必须是 JSON 数组字符串（见 src/lib/env-sources.ts），解析失败会整体忽略。
+  "vars": {
+    "DEFAULT_SOURCES": "[{\"name\":\"量子资源\",\"url\":\"http://cj.lziapi.com/api.php/provide/vod\"},{\"name\":\"非凡资源\",\"url\":\"https://bfzyapi.com/api.php/provide/vod\"},{\"name\":\"555影视\",\"url\":\"https://app7.555618.xyz/api.php/provide/vod\"},{\"name\":\"电影天堂\",\"url\":\"http://caiji.dyttzyapi.com/api.php/provide/vod\"},{\"name\":\"360资源\",\"url\":\"https://360zyzz.com/api.php/provide/vod\"}]"
   }
 
   // 自定义域 tv.cmsj33071.win 目前是在控制台手工挂上去的，这里故意不声明 routes：
