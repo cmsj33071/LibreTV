@@ -10,7 +10,10 @@
     "start": "next start -p 8080",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "cf:build": "npx --yes @opennextjs/cloudflare@1.20.18 build",
+    "cf:preview": "npx --yes @opennextjs/cloudflare@1.20.18 preview",
+    "cf:deploy": "npx --yes @opennextjs/cloudflare@1.20.18 build && npx --yes wrangler@4 deploy"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.59.0",
