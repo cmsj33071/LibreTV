@@ -1,0 +1,45 @@
+{
+  // Cloudflare Workers 构建配置（wrangler v4）
+  // 与线上 Worker `libretv` 的实际设置保持一致：
+  // compatibility_date / flags / 绑定名都按线上回读值填写，避免部署后行为漂移。
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "libretv",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-11-19",
+  // global_fetch_strictly_public：平台级 SSRF 兜底，fetch 到私有/保留地址直接失败。
+  // Workers 上没有 node 的 socket 层，连接级 DNS 校验不可用，这面旗是最后一道防线。
+  "compatibility_flags": ["global_fetch_strictly_public"],
+
+  // 静态资源：OpenNext 构建产物，绑定名必须叫 ASSETS（服务端代码按此名读取）
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  // 图片转换绑定，线上已存在
+  "images": {
+    "binding": "IMAGES"
+  },
+  // OpenNext 的 ISR/缓存回源需要自引用，否则 revalidate 走不通
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "libretv"
+    }
+  ],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true
+    }
+  }
+
+  // 自定义域 tv.cmsj33071.win 目前是在控制台手工挂上去的，这里故意不声明 routes：
+  // 重复声明 custom_domain 在部分账号上会报 already exists。要交给 wrangler 托管时再加：
+  // "routes": [{ "pattern": "tv.cmsj33071.win", "custom_domain": true }]
+  //
+  // PASSWORD 不要写进 vars：用 `wrangler secret put PASSWORD` 或控制台 Secret，
+  // 明文写在配置里等于把它提交进 git。
+}
