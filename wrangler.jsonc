@@ -39,6 +39,8 @@
   // 预置采集源：/api/status 的 defaultSources 直接由它下发，前端首次打开即带出这 5 个源。
   // 值必须是 JSON 数组字符串（见 src/lib/env-sources.ts），解析失败会整体忽略。
   "vars": {
+    // 首页推荐数据源默认值：douban | bangumi | hot-list（见 src/lib/env-recommend-source.ts）
+    "DEFAULT_RECOMMEND_SOURCE": "douban",
     "DEFAULT_SOURCES": "[{\"name\":\"量子资源\",\"url\":\"http://cj.lziapi.com/api.php/provide/vod\"},{\"name\":\"非凡资源\",\"url\":\"https://bfzyapi.com/api.php/provide/vod\"},{\"name\":\"555影视\",\"url\":\"https://app7.555618.xyz/api.php/provide/vod\"},{\"name\":\"电影天堂\",\"url\":\"http://caiji.dyttzyapi.com/api.php/provide/vod\"},{\"name\":\"360资源\",\"url\":\"https://360zyzz.com/api.php/provide/vod\"}]"
   }
 
