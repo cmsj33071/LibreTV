@@ -209,6 +209,26 @@ export function createSSRFAgent(options: { allowPrivate?: boolean } = {}): Agent
 const GLOBAL_FETCH_WRAPPED = Symbol.for('libretv.ssrf.fetch.wrapped');
 
 /**
+ * 是否运行在 Cloudflare Workers（workerd）上。
+ *
+ * 连接级 SSRF 防护依赖 Node 的 socket 层，workerd 上没有等价能力：
+ * 1. `buildConnector` 会把 `ALPNProtocols` 传给 `tls.connect`，workerd 未实现该选项，
+ *    直接抛 `ERR_OPTION_NOT_IMPLEMENTED: The options.ALPNProtocols option is not implemented`；
+ * 2. `safeLookup` 走 `node:dns`，workerd 内无法解析（`ENOTFOUND queryA`）。
+ * 结果就是受保护作用域内的每一次出网都失败——部署到 Workers 后 `/api/proxy` 全量 502。
+ *
+ * Workers 上只能退回原生 fetch，内网/元数据地址由账号开启的
+ * `global_fetch_strictly_public` 兼容标志在平台层拦截（fetch 到私有地址会直接失败）。
+ */
+function isCloudflareWorkers(): boolean {
+  try {
+    return typeof navigator !== 'undefined' && navigator.userAgent === 'Cloudflare-Workers';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * 安装安全的 fetch SSRF 防护包装器。
  * 仅在 runWithSSRFProtection 激活的作用域内生效，自动注入安全专用的 Agent，
  * 不影响外部全局网络通信，杜绝 monkey-patch net.Socket.prototype 造成的全局副作用。
@@ -237,6 +257,24 @@ export function installFetchSSRFProtection(): void {
   ): Promise<Response> {
     const ctx = ssrfStorage.getStore();
     if (!ctx || !ctx.active) {
+      return originalFetch(input, init);
+    }
+
+    if (isCloudflareWorkers()) {
+      // Workers 上没有可用的 socket 层：undici 的 Agent / buildConnector 在这里必抛
+      // （ALPNProtocols 未实现、node:dns 无法解析），只能退回原生 fetch。
+      // 这里保留成本最低的字面量校验，内网目标交给平台的
+      // global_fetch_strictly_public 兜底；DNS 级 TOCTOU 复查在 Workers 上无从谈起，
+      // 因为原生 fetch 也不接受自定义 lookup。
+      if (!ctx.allowPrivate) {
+        const target = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+        if (!isValidProxyUrl(target)) {
+          throw Object.assign(
+            new Error('连接目标被拒绝: 目标地址不在允许范围内（仅支持公网 http/https）'),
+            { code: 'ERR_SSRF_BLOCKED' }
+          );
+        }
+      }
       return originalFetch(input, init);
     }
 

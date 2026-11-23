@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import http from 'node:http';
 import { isPrivateIP, isValidProxyUrl, runWithSSRFProtection } from './ssrf';
 
@@ -223,5 +223,49 @@ describe('DNS Rebinding & Connection SSRF Protection (#941)', () => {
     } finally {
       server.close();
     }
+  });
+});
+
+describe('Cloudflare Workers 运行时', () => {
+  const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+
+  beforeEach(() => {
+    Object.defineProperty(globalThis, 'navigator', {
+      value: { userAgent: 'Cloudflare-Workers' },
+      configurable: true,
+    });
+  });
+
+  afterEach(() => {
+    if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator);
+    else delete (globalThis as { navigator?: unknown }).navigator;
+  });
+
+  it('受保护作用域退回原生 fetch（响应来自内置 Response，而不是依赖里的 undici）', async () => {
+    const server = http.createServer((_req, res) => {
+      res.writeHead(200);
+      res.end('workers-native');
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+    const addr = server.address();
+    if (!addr || typeof addr === 'string') throw new Error('意外的地址');
+    const port = addr.port;
+
+    try {
+      const res = await runWithSSRFProtection({ allowPrivate: true }, async () => {
+        return await fetch(`http://127.0.0.1:${port}/status`);
+      });
+      expect(await res.text()).toBe('workers-native');
+      // workerd 上 undici 的 Agent/buildConnector 必抛 ALPNProtocols 未实现、
+      // node:dns 也解析不了域名，所以这里必须落到原生 fetch：断言响应是内置 Response。
+      expect(res instanceof Response).toBe(true);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('仍然按字面量拦截内网与黑名单目标', async () => {
+    await expect(runWithSSRFProtection({}, async () => fetch('http://127.0.0.1:9/x'))).rejects.toThrow('连接目标被拒绝');
+    await expect(runWithSSRFProtection({}, async () => fetch('http://localhost/x'))).rejects.toThrow('连接目标被拒绝');
   });
 });
